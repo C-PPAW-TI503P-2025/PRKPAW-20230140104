@@ -1,21 +1,28 @@
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
+const PORT = 3001;
+const morgan = require("morgan");
 
+// Impor router
+const presensiRoutes = require("./routes/presensi");
+const reportRoutes = require("./routes/reports");
 
-app.use(
-  cors({
-    origin: "http://localhost:3000", 
-    methods: ["GET", "POST"],
-    credentials: true,
-  })
-);
-
-app.get("/", (req, res) => {
-  res.json({ message: "Hello dari backend Node.js 🚀" });
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(morgan("dev"));
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  next();
 });
-
-app.listen(5000, () => {
-  console.log("Server berjalan di http://localhost:5000");
+app.get("/", (req, res) => {
+  res.send("Home Page for API");
+});
+const ruteBuku = require("./routes/books");
+app.use("/api/books", ruteBuku);
+app.use("/api/presensi", presensiRoutes);
+app.use("/api/reports", reportRoutes);
+app.listen(PORT, () => {
+  console.log(`Express server running at http://localhost:${PORT}/`);
 });
