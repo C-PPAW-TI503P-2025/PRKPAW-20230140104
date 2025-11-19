@@ -16,14 +16,14 @@ module.exports = {
       email: {
         type: Sequelize.STRING,
         allowNull: false,
-        unique: true 
+        unique: true
       },
       password: {
         type: Sequelize.STRING,
         allowNull: false
       },
       role: {
-        type: Sequelize.ENUM('mahasiswa', 'admin'), 
+        type: Sequelize.ENUM('mahasiswa', 'admin'),
         allowNull: false,
         defaultValue: 'mahasiswa'
       },
@@ -37,6 +37,7 @@ module.exports = {
       }
     });
   },
+
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('Users');
   }
