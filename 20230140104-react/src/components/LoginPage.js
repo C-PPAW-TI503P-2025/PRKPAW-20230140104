@@ -1,83 +1,86 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from 'react';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
-export default function LoginPage() {
+function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-  });
-
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
-
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    e.preventDefault(); 
+    setError(null); 
 
-    const res = await fetch("http://localhost:3001/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
+    try {
+      
+      const response = await axios.post('http://localhost:3001/api/auth/login', {
+        email: email,
+        password: password
+      });
 
-    const data = await res.json();
+      const token = response.data.token;
+      localStorage.setItem('token', token); 
 
-    if (res.ok) {
-      localStorage.setItem("token", data.token);
-      alert("Login berhasil!");
-      navigate("/dashboard");
-    } else {
-      alert(data.message);
+      navigate('/dashboard');
+
+    } catch (err) {
+      // 4. Tangani error dari server
+      setError(err.response ? err.response.data.message : 'Login gagal');
     }
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white shadow-xl rounded-xl p-8 w-full max-w-md"
-      >
-        <h1 className="text-2xl font-bold mb-6 text-center">Login</h1>
-
-        <label className="block mb-2 font-medium">Email</label>
-        <input
-          type="email"
-          name="email"
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-4"
-          placeholder="Masukkan email"
-          required
-        />
-
-        <label className="block mb-2 font-medium">Password</label>
-        <input
-          type="password"
-          name="password"
-          onChange={handleChange}
-          className="w-full p-2 border rounded mb-6"
-          placeholder="Masukkan password"
-          required
-        />
-
-        <button
-          type="submit"
-          className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg"
-        >
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
+      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 className="text-3xl font-bold text-center mb-6 text-gray-800">
           Login
-        </button>
-
-        <p className="mt-4 text-center">
-          Belum punya akun?{" "}
+        </h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label 
+              htmlFor="email" 
+              className="block text-sm font-medium text-gray-700"
+            >
+              Email:
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label 
+              htmlFor="password" 
+              className="block text-sm font-medium text-gray-700"
+            >
+              Password:
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
           <button
-            onClick={() => navigate("/register")}
-            className="text-blue-600 underline"
+            type="submit"
+            className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700"
           >
-            Register
+            Login
           </button>
-        </p>
-      </form>
+        </form>
+        {error && (
+          <p className="text-red-600 text-sm mt-4 text-center">{error}</p>
+        )}
+      </div>
     </div>
   );
 }
+export default LoginPage;

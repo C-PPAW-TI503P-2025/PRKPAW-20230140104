@@ -1,5 +1,5 @@
 const presensiRecords = require("../data/presensiData");
-const { Presensi } = require("../models");
+const { Presensi, User } = require("../models");
 const { Op } = require("sequelize");
 const { startOfDay, endOfDay } = require("date-fns");
 const tz = require("date-fns-tz");
@@ -9,25 +9,42 @@ const tz = require("date-fns-tz");
 
 exports.getDailyReport = async (req, res) => {
   try {
-    const { nama } = req.query;
-    let options = { where: {} };
+    const { nama, tanggalMulai, tanggalSelesai } = req.query;
 
+    const options = {
+      where: {},
+      include: [
+        {
+          model: User,
+          as: "user", // ← WAJIB SESUAI ALIAS MODEL
+          attributes: ["nama"],
+        },
+      ],
+    };
+
+    // Filter nama user
     if (nama) {
-      options.where.nama = {
-        [Op.like]: `%${nama}%`,
+      options.include[0].where = {
+        nama: { [Op.like]: `%${nama}%` },
       };
     }
 
-    const records = await Presensi.findAll(options);
+    // Filter tanggal
+    if (tanggalMulai && tanggalSelesai) {
+      options.where.checkIn = {
+        [Op.between]: [
+          new Date(tanggalMulai + "T00:00:00"),
+          new Date(tanggalSelesai + "T23:59:59"),
+        ],
+      };
+    }
 
-    res.json({
-      reportDate: new Date().toLocaleDateString(),
-      data: records,
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Gagal mengambil laporan", error: error.message });
+    const data = await Presensi.findAll(options);
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error("ERROR GET DAILY REPORT:", err);
+    return res.status(500).json({ message: err.message });
   }
 };
 
@@ -35,7 +52,15 @@ exports.getDailyReportByDate = async (req, res) => {
   try {
     const { tanggal } = req.query;
     const timeZone = "Asia/Jakarta";
-    let options = { where: {} };
+        let options = {
+      where: {},
+      include: [
+        {
+          model: User,
+          attributes: ["nama"]
+        }
+      ]
+    };
 
     let targetDate;
 
