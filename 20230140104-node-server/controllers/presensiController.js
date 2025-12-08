@@ -1,6 +1,31 @@
 const { Presensi } = require("../models");
 const { format } = require("date-fns-tz");
 const timeZone = "Asia/Jakarta";
+const multer = require("multer");
+const path = require("path");
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${req.user.id}-${Date.now()}${path.extname(file.originalname)}`);
+  },
+});
+
+// Validasi jenis file
+const fileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith("image/")) {
+    cb(null, true);
+  } else {
+    cb(new Error("Hanya file gambar yang diperbolehkan!"), false);
+  }
+};
+
+exports.upload = multer({
+  storage,
+  fileFilter,
+});
 
 exports.updatePresensi = async (req, res) => {
   try {
@@ -51,45 +76,28 @@ exports.deletePresensi = async (req, res) => {
 
 exports.checkIn = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const { id: userId } = req.user;
     const { latitude, longitude } = req.body;
 
-    // Cek apakah masih ada presensi tanpa checkout
-    const existing = await Presensi.findOne({
-      where: {
-        userId,
-        checkOut: null
-      },
-      order: [["checkIn", "DESC"]]
-    });
-
-    if (existing) {
-      return res.status(400).json({
-        message: "Anda masih memiliki presensi yang belum check-out"
-      });
-    }
+    const buktiFoto = req.file ? req.file.filename : null;
 
     const newRecord = await Presensi.create({
       userId,
       checkIn: new Date(),
       latitude,
-      longitude
+      longitude,
+      buktiFoto: buktiFoto
     });
 
-    return res.status(200).json({
+    return res.status(201).json({
       message: "Check-in berhasil",
-      presensi: newRecord
+      data: newRecord,
     });
-
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Terjadi kesalahan server" });
   }
 };
-
-
-
-
 
 exports.checkOut = async (req, res) => {
   try {

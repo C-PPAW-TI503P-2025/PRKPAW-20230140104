@@ -14,10 +14,27 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+
+      latitude: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+
+      longitude: {
+        type: DataTypes.STRING,
+        allowNull: true
+      },
+
+      buktiFoto: {
+        type: DataTypes.STRING,  // filename/path foto
+        allowNull: true
+      },
+
       checkIn: {
         type: DataTypes.DATE,
         allowNull: false
       },
+
       checkOut: {
         type: DataTypes.DATE,
         allowNull: true

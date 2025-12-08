@@ -1,239 +1,267 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import Webcam from "react-webcam";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import { jwtDecode } from "jwt-decode";
 
-// Fix default icon paths for leaflet
+// Fix Leaflet icon
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
-  iconUrl: require('leaflet/dist/images/marker-icon.png'),
-  shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
+  iconUrl: require("leaflet/dist/images/marker-icon.png"),
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
 });
 
 function getToken() {
-  return localStorage.getItem('token');
+  return localStorage.getItem("token");
 }
 
 function PresensiPage() {
   const navigate = useNavigate();
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
-  const [coords, setCoords] = useState(null);
-  const [manualLat, setManualLat] = useState('');
-  const [manualLng, setManualLng] = useState('');
 
-  // ✅ Cek token saat halaman dibuka
+  // State dasar presensi
+  const [coords, setCoords] = useState(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [manualLat, setManualLat] = useState("");
+  const [manualLng, setManualLng] = useState("");
+
+  // State kamera
+  const webcamRef = useRef(null);
+  const [image, setImage] = useState(null);
+
+  // Screenshot kamera
+  const capture = () => {
+    const imgSrc = webcamRef.current.getScreenshot();
+    setImage(imgSrc);
+  };
+
+  // Cek token
   useEffect(() => {
     const token = getToken();
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) return navigate("/login");
+
     try {
       const decoded = jwtDecode(token);
-      const now = Date.now() / 1000; // waktu sekarang dalam detik
+      const now = Date.now() / 1000;
+
       if (decoded.exp && decoded.exp < now) {
-        // token expired
-        localStorage.removeItem('token');
-        navigate('/login');
+        localStorage.removeItem("token");
+        navigate("/login");
       }
     } catch (err) {
-      localStorage.removeItem('token');
-      navigate('/login');
+      localStorage.removeItem("token");
+      navigate("/login");
     }
   }, [navigate]);
 
-  // Fungsi untuk mendapatkan lokasi pengguna
+  // Ambil lokasi GPS
   const getLocation = () => {
-    setError('');
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setCoords({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-        },
-        (err) => {
-          setError('Gagal mendapatkan lokasi: ' + err.message);
-          console.error('Geolocation error:', err);
-        },
-        { enableHighAccuracy: true, timeout: 15000 }
-      );
-    } else {
-      setError('Geolocation tidak didukung oleh browser ini.');
+    setError("");
+
+    if (!navigator.geolocation) {
+      return setError("Browser tidak mendukung GPS.");
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        });
+      },
+      (err) => {
+        setError("Gagal mendapat lokasi: " + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
   };
 
-  // Dapatkan lokasi saat komponen dimuat
   useEffect(() => {
     getLocation();
   }, []);
 
-  // Koordinat manual fallback
+  // Koordinat manual
   const applyManualCoords = () => {
     const lat = parseFloat(manualLat);
     const lng = parseFloat(manualLng);
-    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+
+    if (isFinite(lat) && isFinite(lng)) {
       setCoords({ lat, lng });
-      setError('Koordinat manual digunakan.');
+      setError("");
+      setMessage("Koordinat manual digunakan.");
     } else {
-      setError('Masukkan koordinat yang valid (desimal).');
+      setError("Masukkan koordinat yang valid.");
     }
   };
 
-  // Config axios dengan token
+  // Axios config
   const axiosConfig = {
     headers: {
       Authorization: `Bearer ${getToken()}`,
+      "Content-Type": "multipart/form-data",
     },
   };
 
-  // Check-In
+  // 🔵 CHECK-IN
   const handleCheckIn = async () => {
-    setMessage('');
-    setError('');
-    if (!coords) {
-      setError('Lokasi belum tersedia. Izinkan akses lokasi atau gunakan koordinat manual.');
-      return;
-    }
+    setMessage("");
+    setError("");
+
+    if (!coords) return setError("Lokasi tidak ditemukan!");
+    if (!image) return setError("Ambil foto terlebih dahulu!");
 
     try {
+      const blob = await (await fetch(image)).blob();
+
+      const formData = new FormData();
+      formData.append("latitude", coords.lat);
+      formData.append("longitude", coords.lng);
+      formData.append("image", blob, "selfie.jpg");
+
       const response = await axios.post(
-        'http://localhost:3001/api/presensi/checkin',
-        {
-          latitude: coords.lat,
-          longitude: coords.lng,
-        },
+        "http://localhost:3001/api/presensi/checkin",
+        formData,
         axiosConfig
       );
-      setMessage(response.data.message || 'Check-in berhasil');
+
+      setMessage(response.data.message);
     } catch (err) {
-      setError(
-        err.response
-          ? err.response.data.message || JSON.stringify(err.response.data)
-          : 'Check-in gagal'
-      );
-      // Jika token invalid/expired, redirect login
-      if (err.response && err.response.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      }
+      setError(err.response?.data?.message || "Check-in gagal.");
     }
   };
 
-  // Check-Out
+  // 🔴 CHECK-OUT
   const handleCheckOut = async () => {
-    setMessage('');
-    setError('');
+    setMessage("");
+    setError("");
+
     try {
       const response = await axios.post(
-        'http://localhost:3001/api/presensi/checkOut',
+        "http://localhost:3001/api/presensi/checkout",
         {},
-        axiosConfig
+        {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        }
       );
-      setMessage(response.data.message || 'Check-out berhasil');
+
+      setMessage(response.data.message);
     } catch (err) {
-      setError(
-        err.response
-          ? err.response.data.message || JSON.stringify(err.response.data)
-          : 'Check-out gagal'
-      );
-      // Jika token invalid/expired, redirect login
-      if (err.response && err.response.status === 401) {
-        localStorage.removeItem('token');
-        navigate('/login');
-      }
+      setError(err.response?.data?.message || "Check-out gagal.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-      {/* Map */}
+    <div className="min-h-screen bg-gray-100 flex flex-col items-center p-4">
+
+      {/* MAP */}
       {coords && (
-        <div className="my-4 border rounded-lg overflow-hidden w-full max-w-md">
+        <div className="my-4 border rounded-lg overflow-hidden w-full max-w-md shadow">
           <MapContainer
             center={[coords.lat, coords.lng]}
             zoom={15}
-            style={{ height: '300px', width: '100%' }}
+            style={{ height: "300px", width: "100%" }}
           >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-            />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <Marker position={[coords.lat, coords.lng]}>
-              <Popup>Lokasi Presensi Anda</Popup>
+              <Popup>Lokasi Anda</Popup>
             </Marker>
           </MapContainer>
         </div>
       )}
 
-      {/* Card */}
+      {/* CARD */}
       <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md text-center">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">Lakukan Presensi</h2>
+        <h2 className="text-3xl font-bold mb-6">Presensi Kehadiran</h2>
 
         {message && <p className="text-green-600 mb-4">{message}</p>}
         {error && <p className="text-red-600 mb-4">{error}</p>}
 
+        {/* Tampilkan koordinat */}
         {coords && (
           <p className="text-sm text-gray-600 mb-4">
-            Lokasi saat ini: {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
+            Lokasi: {coords.lat.toFixed(6)}, {coords.lng.toFixed(6)}
           </p>
         )}
 
-        {!coords && <p className="text-sm text-gray-500 mb-4">Sedang mengambil lokasi...</p>}
-
-        <div className="mb-4">
-          <button onClick={getLocation} className="text-sm text-blue-600 underline">
-            Ambil lokasi ulang
-          </button>
-        </div>
+        <button onClick={getLocation} className="text-blue-600 underline mb-4 text-sm">
+          Ambil lokasi ulang
+        </button>
 
         {/* Koordinat manual */}
         {!coords && (
-          <div className="mb-4 text-left">
-            <p className="text-xs text-gray-500 mb-2">
-              Jika lokasi tidak tersedia, masukkan koordinat secara manual:
-            </p>
-            <div className="flex space-x-2 mb-2">
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2">Gunakan koordinat manual:</p>
+            <div className="flex gap-2">
               <input
                 placeholder="Latitude"
+                className="w-1/2 px-2 py-1 border rounded"
                 value={manualLat}
                 onChange={(e) => setManualLat(e.target.value)}
-                className="w-1/2 px-2 py-1 border rounded"
               />
               <input
                 placeholder="Longitude"
+                className="w-1/2 px-2 py-1 border rounded"
                 value={manualLng}
                 onChange={(e) => setManualLng(e.target.value)}
-                className="w-1/2 px-2 py-1 border rounded"
               />
             </div>
             <button
               onClick={applyManualCoords}
-              className="text-sm py-1 px-3 bg-gray-200 rounded hover:bg-gray-300"
+              className="mt-2 bg-gray-200 px-3 py-1 rounded text-sm"
             >
               Gunakan Koordinat Manual
             </button>
           </div>
         )}
 
-        {/* Tombol Check-in & Check-out */}
-        <div className="flex space-x-4">
+        {/* KAMERA */}
+        <div className="my-4 border rounded overflow-hidden bg-black">
+          {!image ? (
+            <Webcam
+              audio={false}
+              ref={webcamRef}
+              screenshotFormat="image/jpeg"
+              className="w-full"
+              videoConstraints={{ facingMode: "user" }}
+            />
+          ) : (
+            <img src={image} alt="Selfie" className="w-full" />
+          )}
+        </div>
+
+        {/* Tombol Kamera */}
+        {!image ? (
+          <button
+            onClick={capture}
+            className="w-full bg-blue-500 text-white py-3 rounded mb-4"
+          >
+            Ambil Foto 📸
+          </button>
+        ) : (
+          <button
+            onClick={() => setImage(null)}
+            className="w-full bg-gray-500 text-white py-3 rounded mb-4"
+          >
+            Ulangi Foto 🔄
+          </button>
+        )}
+
+        {/* Tombol Presensi */}
+        <div className="flex gap-4">
           <button
             onClick={handleCheckIn}
-            className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700"
+            className="w-full py-3 bg-green-600 text-white rounded hover:bg-green-700"
           >
             Check-In
           </button>
 
           <button
             onClick={handleCheckOut}
-            className="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-md shadow-sm hover:bg-red-700"
+            className="w-full py-3 bg-red-600 text-white rounded hover:bg-red-700"
           >
             Check-Out
           </button>
