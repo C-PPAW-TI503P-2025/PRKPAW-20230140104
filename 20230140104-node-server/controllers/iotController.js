@@ -39,3 +39,23 @@ exports.receiveSensorData = async (req, res) => {
     res.status(500).json({ status: "error", message: error.message });
   }
 };
+
+exports.getSensorHistory = async (req, res) => {
+  try {
+    // Ambil 20 data terakhir, diurutkan dari yang paling baru
+    const data = await SensorLog.findAll({
+      limit: 20,
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Kita balik urutannya (reverse) agar di grafik muncul dari Kiri (Lama) ke Kanan (Baru)
+    const formattedData = data.reverse(); 
+
+    res.json({
+      status: "success",
+      data: formattedData
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -8,6 +8,7 @@ import RegisterPage from './components/RegisterPage';
 import DashboardPage from './components/DashboardPage';
 import ReportPage from './components/ReportPage';
 import PresensiPage from './components/PresensiPage';
+import SensorPage from './components/SensorPage';
 
 function App() {
   return (
@@ -30,6 +31,9 @@ function App() {
         {/* Presensi */}
         <Route path="/checkin" element={<PresensiPage mode="checkin" />} />
         <Route path="/checkout" element={<PresensiPage mode="checkout" />} />
+
+        {/* Monitoring */}
+        <Route path="/monitoring" element={<SensorPage />} />
 
         {/* Default */}
         <Route path="*" element={<LoginPage />} />

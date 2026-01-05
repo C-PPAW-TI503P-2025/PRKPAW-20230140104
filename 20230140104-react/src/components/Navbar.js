@@ -31,6 +31,9 @@ function Navbar() {
           <Link to="/dashboard" style={{ color: "#fff", marginRight: 16, textDecoration: "none" }}>
             Dashboard
           </Link>
+          <Link to="/monitoring" style={{ color: "#fff", marginRight: 16, textDecoration: "none" }}>
+            Monitoring Suhu
+          </Link>
 
           {token && (
             <Link to="/presensi" style={{ color: "#fff", marginRight: 16, textDecoration: "none" }}>
